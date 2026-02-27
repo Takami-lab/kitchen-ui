@@ -646,10 +646,11 @@
         } else {
             const recognition = new SpeechRecognition();
             recognition.lang            = 'ja-JP';
-            recognition.interimResults  = false;
+            recognition.interimResults  = true;  // リアルタイム表示ON（認識中の文字を即表示）
             recognition.maxAlternatives = 1;
 
             let isRecording = false;
+            let hadResult   = false; // 確定結果が返ってきたかのフラグ
 
             micButton.addEventListener('click', () => {
                 if (isRecording) {
@@ -663,24 +664,55 @@
             // 録音開始
             recognition.onstart = () => {
                 isRecording = true;
+                hadResult   = false;
                 setState('recording', {
-                    question: '...',
+                    question: 'マイクに向かって話してください',
                     answer:   '聞き取り中...',
                 });
             };
 
-            // 音声認識結果
+            // 音声認識結果（インタリム＋ファイナル両対応）
             recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                questionEl.innerHTML = `「${transcript}」`;
-                callMiiboAPI(transcript);
+                let interim = ''; // 途中経過（未確定）
+                let final   = ''; // 確定結果
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const text = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        final += text;
+                    } else {
+                        interim += text;
+                    }
+                }
+
+                // 途中経過をリアルタイム表示（声が拾えているか視覚的に確認できる）
+                if (interim) {
+                    questionEl.innerHTML = `「${interim}...」`;
+                }
+
+                // 確定結果が出たらAPIへ送信
+                if (final) {
+                    hadResult = true;
+                    questionEl.innerHTML = `「${final}」`;
+                    callMiiboAPI(final);
+                }
             };
 
-            // 録音終了（結果なしで終わった場合はアイドルへ戻す）
+            // 録音終了
             recognition.onend = () => {
                 isRecording = false;
                 if (currentState === 'recording') {
-                    setState('idle', IDLE);
+                    if (hadResult) {
+                        // 正常終了（結果あり）→ アイドルへ
+                        setState('idle', IDLE);
+                    } else {
+                        // 結果なしで終了 → 原因を表示
+                        setState('error', {
+                            question: '音声を認識できませんでした',
+                            answer:   'もう一度話しかけてください。<br>騒音が影響する場合は<br>マイクに近づいてください。',
+                        });
+                        resetTimer = setTimeout(() => setState('idle', IDLE), 6000);
+                    }
                 }
             };
 
