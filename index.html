@@ -578,6 +578,26 @@
         });
         requestWakeLock();
 
+        // ── 起動時マイク権限チェック（プロンプトを出さずに確認） ──
+        if (navigator.permissions) {
+            navigator.permissions.query({ name: 'microphone' })
+                .then(status => {
+                    if (status.state === 'denied') {
+                        setState('error', {
+                            question: 'マイクへのアクセスが拒否されています',
+                            answer:   'ブラウザの設定から<br>マイクを許可してください',
+                        });
+                    }
+                    // ブラウザ設定で許可に変更されたら自動復帰
+                    status.onchange = () => {
+                        if (status.state === 'granted' && currentState === 'error') {
+                            setState('idle', IDLE);
+                        }
+                    };
+                })
+                .catch(() => {}); // 非対応ブラウザは無視
+        }
+
         // ── 回答フォント自動スケーリング ─────────────────────────
         // 長い回答でもディスプレイから溢れないよう文字数に応じてサイズを調整
         function autoScaleAnswer() {
@@ -664,14 +684,58 @@
                 }
             };
 
-            // エラー
+            // エラー（種類別に詳細メッセージ）
             recognition.onerror = (event) => {
                 isRecording = false;
-                const msg = event.error === 'no-speech'
-                    ? '音声が検出されませんでした。<br>もう一度押してください。'
-                    : 'エラーが発生しました。<br>もう一度お試しください。';
-                setState('error', { answer: msg });
-                resetTimer = setTimeout(() => setState('idle', IDLE), 5000);
+                console.error('🎙️ 音声認識エラー種別:', event.error, event);
+
+                // aborted（ユーザーがキャンセル）は静かにアイドルへ
+                if (event.error === 'aborted') {
+                    if (currentState === 'recording') setState('idle', IDLE);
+                    return;
+                }
+
+                // エラー種別 → 日本語メッセージのマッピング
+                const ERROR_MAP = {
+                    // ── マイク権限系 ──
+                    'not-allowed': [
+                        'マイクへのアクセスが<br>拒否されています。',
+                        'ブラウザの設定から<br>マイクを許可してください。',
+                        15000,
+                    ],
+                    'service-not-allowed': [
+                        'マイクへのアクセスが<br>拒否されています。',
+                        'ページをHTTPSで開くか<br>ブラウザの設定を確認してください。',
+                        15000,
+                    ],
+                    // ── ハードウェア系 ──
+                    'audio-capture': [
+                        'マイクが見つかりません。',
+                        'タブレットのマイク設定を<br>確認してください。',
+                        8000,
+                    ],
+                    // ── ネットワーク系 ──
+                    'network': [
+                        'ネットワークエラー。',
+                        'Wi-Fi接続を確認してください。<br>（音声認識にはWi-Fiが必要です）',
+                        8000,
+                    ],
+                    // ── 音声未検出 ──
+                    'no-speech': [
+                        '声が聞こえませんでした。',
+                        'もう少し大きな声で<br>もう一度押してください。',
+                        5000,
+                    ],
+                };
+
+                const [question, answer, delay] = ERROR_MAP[event.error] ?? [
+                    `エラー: ${event.error}`,
+                    'もう一度お試しください。',
+                    6000,
+                ];
+
+                setState('error', { question, answer });
+                resetTimer = setTimeout(() => setState('idle', IDLE), delay);
             };
 
             // miibo API 呼び出し（15秒タイムアウト付き）
