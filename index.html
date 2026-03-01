@@ -314,6 +314,15 @@
             100% { transform: translateY(-68px)  scale(2.6); opacity: 0; }
         }
     </style>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <script>
+     if ('serviceWorker' in navigator) {
+     navigator.serviceWorker.register('./sw.js')
+      .then(function() { console.log('Service Worker 登録完了'); });
+    }
+   </script>
 </head>
 <body class="idle">
 
@@ -749,4 +758,5 @@
     </script>
 </body>
 </html>
+
 
