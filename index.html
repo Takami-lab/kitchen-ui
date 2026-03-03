@@ -294,7 +294,7 @@
         #lettuce, #tomato, #cheese, #patty {
             transform-box: fill-box; transform-origin: center;
         }
-        body.recording #lettuce { animation: ing-wiggle 0.38s ease-in-out          infinite; }
+        body.recording #lettuce { animation: ing-wiggle 0.38s ease-in-out         infinite; }
         body.recording #tomato  { animation: ing-wiggle 0.38s ease-in-out 0.08s   infinite; }
         body.recording #cheese  { animation: ing-wiggle 0.38s ease-in-out 0.16s   infinite; }
         body.recording #patty   { animation: ing-wiggle 0.38s ease-in-out 0.24s   infinite; }
@@ -435,13 +435,6 @@
     <script>
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-        // ==========================================
-        // 【設定】miibo APIの情報
-        // ==========================================
-        const MIIBO_API_KEY  = "4774d7f7-de41-4e7a-8867-ba82e0c8ce0b19c9f440c7f259";
-        const MIIBO_AGENT_ID = "f05e2478-566d-4979-80c3-36eb0b21cc0119c95864995fb";
-        // ==========================================
-
         const body           = document.body;
         const micButton      = document.getElementById('mic-button');
         const statusLabel    = document.getElementById('status-label');
@@ -487,7 +480,7 @@
         }
 
         function positionFloating() {
-            const zoneTop    = parseFloat(burgerZone.style.top)    || 0;
+            const zoneTop    = parseFloat(burgerZone.style.top)  || 0;
             const zoneHeight = parseFloat(burgerZone.style.height) || 0;
             const aboveY     = Math.max(zoneTop - 72, 56);
 
@@ -679,7 +672,6 @@
                     });
                     resetTimer = setTimeout(() => setState('idle', { question: '', answer: '' }), 6000);
                 }
-                // hadResult=true → callMiiboAPI is handling state
             };
 
             recognition.onerror = (event) => {
@@ -710,13 +702,15 @@
                 const timeoutId  = setTimeout(() => controller.abort(), 15000);
 
                 try {
-                    const res = await fetch('https://api-mebo.dev/api', {
+                    // ★"あなたのVercelのURL" の部分を実際のドメインに書き換えてください。
+                    // 例：https://miibo-proxy-xxxxx.vercel.app/api/chat
+                    const proxyUrl = 'https://miibo-proxy.vercel.app/api/chat';
+
+                    const res = await fetch(proxyUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         signal: controller.signal,
                         body: JSON.stringify({
-                            api_key:   MIIBO_API_KEY,
-                            agent_id:  MIIBO_AGENT_ID,
                             utterance: question,
                             uid:       'nishinomiya_kitchen_tablet_01',
                         }),
@@ -758,5 +752,3 @@
     </script>
 </body>
 </html>
-
-
